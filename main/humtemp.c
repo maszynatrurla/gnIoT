@@ -99,7 +99,7 @@ static uint32_t time_diff_cc_us(uint32_t later_cc)
  * Set pin connected to DHT-11 data as output.
  * Prepare for first phase of DHT data read - read request sending.
  */
-static void setOutput(void)
+static void set_output(void)
 {
     gpio_config_t io_conf;
     //disable interrupt
@@ -121,7 +121,7 @@ static void setOutput(void)
  * Prepare for second phase of DHT data read -
  * capture of data.
  */
-static void setInput(void)
+static void set_input(void)
 {
     gpio_config_t io_conf;
     // enable interrupt for both edges of signal
@@ -253,7 +253,7 @@ int humtemp_read(Humidity_t * humidity, Temperature_t * temperature)
     s_dht_read_state = E_DHT_RD_START;
 
     /* request transmission, by forcing DHT's DATA pin LOW */
-    setOutput();
+    set_output();
     gpio_set_level(DHT_DATA_PIN, 0);
     /* transmission request must last at least 18 milliseconds */
     vTaskDelay(30 / portTICK_RATE_MS);
@@ -262,7 +262,7 @@ int humtemp_read(Humidity_t * humidity, Temperature_t * temperature)
     gpio_isr_handler_add(DHT_DATA_PIN, gpio_isr_handler, NULL);
     /* save time when transaction started */
     s_prev_time = asm_ccount();
-    setInput(); // reconfiguring pin will bring it back HIGH (pull up)
+    set_input(); // reconfiguring pin will bring it back HIGH (pull up)
 
     /* Wait for data read to be complete.
      * Wait for maximum of 1 second. */

@@ -3,13 +3,17 @@
  * Based on hello-world template from ESP8266_RTOS_SDK.
  */
 
+
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_spi_flash.h"
+#include "nvs.h"
+#include "nvs_flash.h"
 
 #include "humtemp.h"
+#include "wifi.h"
 
 /**
  * Basic test of humtemp module.
@@ -63,10 +67,21 @@ void app_main()
     printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
             (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
+    ESP_ERROR_CHECK(nvs_flash_init());
+
+    int conn_result = wifi_connect();
+
+    if (0 == conn_result)
+    {
+        printf("Connected to wifi. IP address = %s\n", wifi_getIpAddress());
+    }
+
     ht_test();
 
+    wifi_disconnect();
 
-    for (int i = 10; i >= 0; i--) {
+    for (int i = 10; i >= 0; i--)
+    {
         printf("Restarting in %d seconds...\n", i);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
