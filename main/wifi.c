@@ -17,6 +17,8 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+/* Must define wifi credential strings:
+ *  CRED_MY_SSID and CRED_MY_PWD */
 #include "credentials.h"
 
 #define MAXIMUM_RETRY   8
@@ -133,25 +135,21 @@ const char * wifi_getIpAddress(void)
 
 int wifi_disconnect(void)
 {
-    esp_err_t err;
-
     // not connected yet
     if (s_connect_event_group == NULL) {
         return -1;
     }
+
+    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_handler));
+    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &got_ip_handler));
+
     vEventGroupDelete(s_connect_event_group);
     s_connect_event_group = NULL;
 
-    err = esp_wifi_stop();
-    if (err == ESP_ERR_WIFI_NOT_INIT)
-    {
-        return -2;
-    }
-    ESP_ERROR_CHECK(err);
-    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_handler));
-    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &got_ip_handler));
+    esp_wifi_stop();
     ESP_ERROR_CHECK(esp_wifi_deinit());
 
     ESP_LOGI(TAG, "Disconnected from wifi");
     return 0;
+
 }

@@ -22,7 +22,7 @@
 /**
  * GPIO used for data line to DHT11 chip.
  */
-#define DHT_DATA_PIN    5
+#define DHT_DATA_PIN    2
 
 /**
  * How many clock ticks (in CCOUNT register) per microsecond?
@@ -269,7 +269,7 @@ int humtemp_read(Humidity_t * humidity, Temperature_t * temperature)
     if (xQueueReceive(evt_queue, &dummy, 1000 / portTICK_PERIOD_MS))
     {
         /* verify read data by checksum */
-        if ((s_read.dat[0] + s_read.dat[1] + s_read.dat[2] + s_read.dat[3]) == s_read.dat[4])
+        if ((255 & (s_read.dat[0] + s_read.dat[1] + s_read.dat[2] + s_read.dat[3])) == s_read.dat[4])
         {
             ESP_LOGI(TAG, "T=%3d.%-2d C  %3d.%-2d rh\n", (int) s_read.dat[0], (int) s_read.dat[1],
                     (int) s_read.dat[2], (int) s_read.dat[3]);
@@ -284,7 +284,7 @@ int humtemp_read(Humidity_t * humidity, Temperature_t * temperature)
         {
             ESP_LOGW(TAG, "CHECKSUM ERROR: %d+%d+%d+%d=%d NOT %d",(int) s_read.dat[0],
                     (int) s_read.dat[1], (int) s_read.dat[2], (int) s_read.dat[3],
-                    (int) (s_read.dat[0] + s_read.dat[1] + s_read.dat[2] + s_read.dat[3]),
+                    (int) (155 & (s_read.dat[0] + s_read.dat[1] + s_read.dat[2] + s_read.dat[3])),
                     (int) s_read.dat[4]);
             result = HT_E_CHECKSUM;
         }
