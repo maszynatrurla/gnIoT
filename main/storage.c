@@ -24,8 +24,8 @@
 
 #define DEFAULT_MEASURE_COUNT       3
 #define DEFAULT_MEASURE_PERIOD      60
-#define DEFAULT_MEASURES_PER_SLEEP  2
-#define DEFAULT_SLEEP_LENGTH        0
+#define DEFAULT_MEASURES_PER_SLEEP  1
+#define DEFAULT_SLEEP_LENGTH        3
 
 static GniotConfig_t s_config;
 
@@ -68,8 +68,8 @@ void config_init(void)
     }
     else
     {
-        strncpy(s_config.fallback_server_address, CRED_DEFAULT_SERVER, sizeof(s_config.server_address));
-        s_config.fallback_server_port = CRED_DEFAULT_SERVER_PORT;
+        strncpy(s_config.fallback_server_address, CRED_DEFAULT_FALLBACK_SERVER, sizeof(s_config.server_address));
+        s_config.fallback_server_port = CRED_DEFAULT_FALLBACK_PORT;
     }
 
     if (ESP_OK == nvs_get_u32(handle, STO_KEY_MY_ID, &tmp32))

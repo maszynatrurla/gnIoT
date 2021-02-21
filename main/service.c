@@ -13,11 +13,30 @@
 #include "service.h"
 #include "storage.h"
 #include "client.h"
+#include "ota.h"
 
 #define DEFAULT_PORT    80
 
+enum {
+    S_CMD_DUMP_CFG,
+    S_CMD_OTA,
+};
+
+#define CMD_SET(C)      (s_cmd.flags |= (1 << (C)))
+#define IS_ANY_CMD_SET  (s_cmd.flags != 0)
+#define IS_CMD_SET(C)   ((s_cmd.flags & (1 << (C))) != 0)
+#define CMD_CLEAR(C)    (s_cmd.flag &= ~(1UL << (C)))
+#define CMD_CLEAR_ALL() (s_cmd.flags = 0)
+
+typedef struct {
+    uint32_t flags;
+} Cmd_t;
+
 static char request_buf [256];
 static char add_buf[18];
+
+static Cmd_t s_cmd = {0};
+
 
 /**
  * Primitive and rather silly IP address parser/validator.
@@ -138,30 +157,40 @@ void command_handler(const char * key, const char * val)
                 cfg->fallback_server_address, (int) cfg-> fallback_server_port);
         config_switch_server();
     }
+    else if (0 == strcmp("do_ota", key))
+    {
+        printf("do_ota requested\n");
+        CMD_SET(S_CMD_OTA);
+    }
 }
 
 void service_send(int connection_status, uint32_t measurement)
 {
     const GniotConfig_t * cfg = config_get();
 
-    if (NO_MEASUREMENT == measurement)
-    {
-        sprintf(request_buf, "GET /kloc?id=%u HTTP/1.0\r\n"
-                "Host: 192.168.1.100\r\n"
-                "User-Agent: esp-idf/1.0 esp32\r\n"
-                "\r\n", cfg->my_id);
-    }
-    else
-    {
-        sprintf(request_buf, "GET /kloc?id=%u&m_0=%u HTTP/1.0\r\n"
-                "Host: 192.168.1.100\r\n"
-                "User-Agent: esp-idf/1.0 esp32\r\n"
-                "\r\n", cfg->my_id, measurement);
-    }
-
     int r = client_open();
+
+    CMD_CLEAR_ALL();
+
+
     if (!r)
     {
+        if (NO_MEASUREMENT == measurement)
+        {
+            sprintf(request_buf, "GET /kloc?id=%u HTTP/1.0\r\n"
+                    "Host: %s\r\n"
+                    "User-Agent: esp-idf/1.0 esp32\r\n"
+                    "\r\n", cfg->my_id, client_get_connected_server());
+        }
+        else
+        {
+            sprintf(request_buf, "GET /kloc?id=%u&m_0=%u HTTP/1.0\r\n"
+                    "Host: %s\r\n"
+                    "User-Agent: esp-idf/1.0 esp32\r\n"
+                    "\r\n", cfg->my_id, measurement,
+                    client_get_connected_server());
+        }
+
         r = client_request(request_buf, strlen(request_buf));
         if (!r)
         {
@@ -174,5 +203,13 @@ void service_send(int connection_status, uint32_t measurement)
         }
         client_close();
     }
+
+    if (IS_CMD_SET(S_CMD_OTA))
+    {
+        printf("Perform OTA\n");
+        do_ota_upgrade("/ota");
+    }
+
+    CMD_CLEAR_ALL();
 }
 

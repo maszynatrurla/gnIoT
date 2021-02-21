@@ -14,6 +14,7 @@
 #include "esp_sleep.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "esp_ota_ops.h"
 
 #include "storage.h"
 #include "measurements.h"
@@ -30,8 +31,21 @@ static xQueueHandle s_measurement_queue = NULL;
 static void debug_hello(void)
 {
     esp_chip_info_t chip_info;
+    const esp_partition_t *configured = esp_ota_get_boot_partition();
+    const esp_partition_t *partition = esp_ota_get_running_partition();
+    const GniotConfig_t * cfg = config_get();
 
     printf("\nGNIOT MALY\n\n");
+    printf("My Id: %u\n", cfg->my_id);
+    printf("Measure period [s]: %d\n", (int) cfg->measure_period);
+    printf("Samples per measurement: %d\n", (int) cfg->samples_per_measure);
+    printf("Measurements per sleep : %d\n", (int) cfg->measures_per_sleep);
+    printf("Sleep length [m]: %d\n", (int) cfg->sleep_length);
+    printf("Main server: %s:%d\n", cfg->server_address, (int)  cfg->server_port);
+    printf("Backup server: %s:%d\n", cfg->fallback_server_address, (int)  cfg->fallback_server_port);
+
+    printf("\nPartition configured %08X\n", configured->address);
+    printf("Partition running %08X\n\n", partition->address);
 
     esp_chip_info(&chip_info);
     printf("This is ESP8266 chip with %d CPU cores, WiFi, ",
@@ -127,12 +141,12 @@ void app_main()
     int conn_result;
     int sleep_min;
 
-    /* Print chip information */
-    debug_hello();
-
     /* read nonvolatile data */
     storage_init();
     config_init();
+
+    /* Print chip information */
+    debug_hello();
 
     /* create a queue for intertask comm */
     s_measurement_queue = xQueueCreate(10, sizeof(uint32_t));

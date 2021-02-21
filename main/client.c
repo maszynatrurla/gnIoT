@@ -39,11 +39,19 @@ typedef struct {
  * Addresses to try ordered by priority.
  */
 static ServerAddress_t s_servers [2];
+/**
+ * Index of currently used server.
+ */
+static int s_server_index = 0;
 
 /**
  * Socket handle.
  */
 static int s_socket = -1;
+
+static char s_host_buf[32];
+
+static char big_rcv_buf [1024];
 
 /**
  * (Re)init tokenizer buffer.
@@ -125,12 +133,16 @@ int client_open(void)
         return -1;
     }
 
+    // get server address (it might've changed since last call)
     init_addresses();
 
     for (srv_idx = 0; srv_idx < 2; ++srv_idx)
     {
         struct addrinfo *res;
         const ServerAddress_t * web_server = &s_servers[srv_idx];
+
+        /* DNS lookup is not really needed since we use local (numerical) addresses
+         * only. But it might come in handy in the future. */
         int err = getaddrinfo(web_server->address, web_server->port, &hints, &res);
 
         if(err != 0 || res == NULL)
@@ -159,6 +171,7 @@ int client_open(void)
         ESP_LOGI(TAG, "... connected");
         freeaddrinfo(res);
         result = 0;
+        s_server_index = srv_idx;
         break;
     }
 
@@ -222,6 +235,26 @@ int client_response(void)
             putchar(recv_buf[i]);
         }
     } while (r > 0);
+
+    return r == 0;
+}
+
+
+
+int client_response_hdl(response_buf_handler handler)
+{
+    int r;
+
+    /* Read HTTP response */
+    do {
+        bzero(big_rcv_buf, sizeof(big_rcv_buf));
+        r = read(s_socket, big_rcv_buf, sizeof(big_rcv_buf)-1);
+        if (0 != handler(big_rcv_buf, r))
+        {
+            r = -1;
+        }
+    }
+    while (r > 0);
 
     return r == 0;
 }
@@ -312,3 +345,14 @@ int client_response_iterate(reponse_handler handler)
     return status;
 }
 
+const char * client_get_connected_server(void)
+{
+    if (s_server_index < 2)
+    {
+        snprintf(s_host_buf, sizeof(s_host_buf) - 1, "%s:%s", s_servers[s_server_index].address,
+                s_servers[s_server_index].port);
+        return s_host_buf;
+    }
+
+    return "";
+}

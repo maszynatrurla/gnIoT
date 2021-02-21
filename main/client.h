@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 
+typedef int (*response_buf_handler)(const char * data, int length);
 typedef void (*reponse_handler)(const char * key, const char * value);
 
 /**
@@ -41,5 +42,13 @@ int client_response(void);
  * from server
  */
 int client_response_iterate(reponse_handler handler);
+/**
+ * Get response and receive bytes.
+ */
+int client_response_hdl(response_buf_handler handler);
+/**
+ * Get address of connected server.
+ */
+const char * client_get_connected_server(void);
 
 #endif /* MAIN_CLIENT_H_ */
