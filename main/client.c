@@ -49,9 +49,9 @@ static int s_server_index = 0;
  */
 static int s_socket = -1;
 
-static char s_host_buf[32];
-
 static char big_rcv_buf [1024];
+
+static char big_snd_buf [512];
 
 /**
  * (Re)init tokenizer buffer.
@@ -345,14 +345,74 @@ int client_response_iterate(reponse_handler handler)
     return status;
 }
 
-const char * client_get_connected_server(void)
+
+int request_new(Request_t * request, const char * endpoint)
+{
+    const GniotConfig_t * cfg = config_get();
+    int printed = snprintf(big_snd_buf, sizeof(big_snd_buf) - 1, "GET %s?id=%u", endpoint, cfg->my_id);
+    request->ptr = &big_snd_buf[printed];
+
+    return 0;
+}
+
+int request_sets(Request_t * request, const char * key, const char * value)
+{
+    char * out = (char *) request->ptr;
+    int capacity = sizeof(big_snd_buf) - (((unsigned) out) - ((unsigned) big_snd_buf));
+
+    if ((out > big_snd_buf) && (out < &big_snd_buf[sizeof(big_snd_buf) - 1]))
+    {
+        int printed = snprintf(out, capacity - 1, "&%s=%s", key, value);
+        request->ptr = &out[printed];
+        return 0;
+    }
+    return -1;
+}
+
+int request_seti(Request_t * request, const char * key, int32_t value)
+{
+    char * out = (char *) request->ptr;
+    int capacity = sizeof(big_snd_buf) - (((unsigned) out) - ((unsigned) big_snd_buf));
+
+    if ((out > big_snd_buf) && (out < &big_snd_buf[sizeof(big_snd_buf) - 1]))
+    {
+        int printed = snprintf(out, capacity - 1, "&%s=%d", key, value);
+        request->ptr = &out[printed];
+        return 0;
+    }
+    return -1;
+}
+
+int request_setu(Request_t * request, const char * key, uint32_t value)
+{
+    char * out = (char *) request->ptr;
+    int capacity = sizeof(big_snd_buf) - (((unsigned) out) - ((unsigned) big_snd_buf));
+
+    if ((out > big_snd_buf) && (out < &big_snd_buf[sizeof(big_snd_buf) - 1]))
+    {
+        int printed = snprintf(out, capacity - 1, "&%s=%u", key, value);
+        request->ptr = &out[printed];
+        return 0;
+    }
+    return -1;
+}
+
+const char * request_make(Request_t * request)
 {
     if (s_server_index < 2)
     {
-        snprintf(s_host_buf, sizeof(s_host_buf) - 1, "%s:%s", s_servers[s_server_index].address,
-                s_servers[s_server_index].port);
-        return s_host_buf;
-    }
+        char * out = (char *) request->ptr;
+        int capacity = sizeof(big_snd_buf) - (((unsigned) out) - ((unsigned) big_snd_buf));
 
-    return "";
+        if ((out > big_snd_buf) && (out < &big_snd_buf[sizeof(big_snd_buf) - 1]))
+        {
+            snprintf(out, capacity - 1, " HTTP/1.0\r\n"
+                    "Host: %s:%s\r\n"
+                    "User-Agent: esp-idf/1.0 esp32\r\n"
+                    "\r\n", s_servers[s_server_index].address, s_servers[s_server_index].port);
+            return big_snd_buf;
+        }
+    }
+    return NULL;
 }
+

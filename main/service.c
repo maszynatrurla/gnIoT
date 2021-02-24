@@ -14,6 +14,7 @@
 #include "storage.h"
 #include "client.h"
 #include "ota.h"
+#include "rtc.h"
 
 #define DEFAULT_PORT    80
 
@@ -32,7 +33,6 @@ typedef struct {
     uint32_t flags;
 } Cmd_t;
 
-static char request_buf [256];
 static char add_buf[18];
 
 static Cmd_t s_cmd = {0};
@@ -104,7 +104,12 @@ void command_handler(const char * key, const char * val)
 {
     const GniotConfig_t * cfg = config_get();
 
-    if (0 == strcmp("new_server", key))
+    if (0 == strcmp("timestamp", key))
+    {
+        printf("Timestamp: %s\n", val);
+        set_timestamp((uint32_t) atoll(val));
+    }
+    else if (0 == strcmp("new_server", key))
     {
         const char * address;
         uint16_t port;
@@ -162,6 +167,34 @@ void command_handler(const char * key, const char * val)
         printf("do_ota requested\n");
         CMD_SET(S_CMD_OTA);
     }
+    else if (0 == strcmp("dump_cfg", key))
+    {
+        printf("dump_cfg requested\n");
+        CMD_SET(S_CMD_DUMP_CFG);
+    }
+}
+
+static void dump_config(const GniotConfig_t * cfg)
+{
+    Request_t request;
+    const char * reqs;
+    int r = client_open();
+
+    if (!r)
+    {
+        request_new(&request, "/kloc");
+        request_sets(&request, "server_address", cfg->server_address);
+        request_seti(&request, "server_port", cfg->server_port);
+        request_sets(&request, "fallback_server_address", cfg->fallback_server_address);
+        request_seti(&request, "fallback_server_port", cfg->fallback_server_port);
+        request_seti(&request, "measure_period", cfg->measure_period);
+        request_seti(&request, "measures_per_sleep", cfg->measures_per_sleep);
+        request_seti(&request, "samples_per_measure", cfg->samples_per_measure);
+        request_seti(&request, "sleep_length", cfg->sleep_length);
+        reqs = request_make(&request);
+        client_request(reqs, strlen(reqs));
+        client_close();
+    }
 }
 
 void service_send(int connection_status, uint32_t measurement)
@@ -175,23 +208,20 @@ void service_send(int connection_status, uint32_t measurement)
 
     if (!r)
     {
-        if (NO_MEASUREMENT == measurement)
+        Request_t request;
+        const char * request_str;
+        request_new(&request, "/kloc");
+
+        if (NO_MEASUREMENT != measurement)
         {
-            sprintf(request_buf, "GET /kloc?id=%u HTTP/1.0\r\n"
-                    "Host: %s\r\n"
-                    "User-Agent: esp-idf/1.0 esp32\r\n"
-                    "\r\n", cfg->my_id, client_get_connected_server());
-        }
-        else
-        {
-            sprintf(request_buf, "GET /kloc?id=%u&m_0=%u HTTP/1.0\r\n"
-                    "Host: %s\r\n"
-                    "User-Agent: esp-idf/1.0 esp32\r\n"
-                    "\r\n", cfg->my_id, measurement,
-                    client_get_connected_server());
+            char keybuf[14];
+            sprintf(keybuf, "m_%u", get_timestamp());
+            request_setu(&request, keybuf, measurement);
         }
 
-        r = client_request(request_buf, strlen(request_buf));
+        request_str = request_make(&request);
+
+        r = client_request(request_str, strlen(request_str));
         if (!r)
         {
             r = client_response_iterate(command_handler);
@@ -201,13 +231,18 @@ void service_send(int connection_status, uint32_t measurement)
             }
 
         }
-        client_close();
     }
+    client_close();
 
     if (IS_CMD_SET(S_CMD_OTA))
     {
         printf("Perform OTA\n");
         do_ota_upgrade("/ota");
+    }
+    if (IS_CMD_SET(S_CMD_DUMP_CFG))
+    {
+        printf("Dump cfg\n");
+        dump_config(cfg);
     }
 
     CMD_CLEAR_ALL();

@@ -14,6 +14,10 @@
 typedef int (*response_buf_handler)(const char * data, int length);
 typedef void (*reponse_handler)(const char * key, const char * value);
 
+typedef struct {
+    void * ptr;
+} Request_t;
+
 /**
  * Open connection to server.
  */
@@ -46,9 +50,12 @@ int client_response_iterate(reponse_handler handler);
  * Get response and receive bytes.
  */
 int client_response_hdl(response_buf_handler handler);
-/**
- * Get address of connected server.
- */
-const char * client_get_connected_server(void);
+
+int request_new(Request_t * request, const char * endpoint);
+int request_sets(Request_t * request, const char * key, const char * value);
+int request_seti(Request_t * request, const char * key, int32_t value);
+int request_setu(Request_t * request, const char * key, uint32_t value);
+const char * request_make(Request_t * request);
+
 
 #endif /* MAIN_CLIENT_H_ */

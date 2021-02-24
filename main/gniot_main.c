@@ -22,6 +22,7 @@
 #include "wifi.h"
 #include "client.h"
 #include "service.h"
+#include "rtc.h"
 
 #define MEAS_FAILED     0xFFFFFFFF
 #define MEAS_FINISHED   0xFFFFFFF0
@@ -37,6 +38,7 @@ static void debug_hello(void)
 
     printf("\nGNIOT MALY\n\n");
     printf("My Id: %u\n", cfg->my_id);
+    printf("Time: %u\n", get_timestamp());
     printf("Measure period [s]: %d\n", (int) cfg->measure_period);
     printf("Samples per measurement: %d\n", (int) cfg->samples_per_measure);
     printf("Measurements per sleep : %d\n", (int) cfg->measures_per_sleep);
@@ -144,6 +146,7 @@ void app_main()
     /* read nonvolatile data */
     storage_init();
     config_init();
+    time_init();
 
     /* Print chip information */
     debug_hello();
@@ -194,6 +197,7 @@ void app_main()
     sleep_min = config_get()->sleep_length;
     printf("Going to sleep for %d minutes\n", sleep_min);
     fflush(stdout);
+    save_timestamp();
     esp_deep_sleep(sleep_min * 60 * 1000000);
 
     // code below should not be executed anymore

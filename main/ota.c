@@ -241,7 +241,8 @@ int do_ota_upgrade(const char * endpoint)
 {
     esp_err_t err;
     int r;
-    char req_buf[128];
+    Request_t req;
+    const char * reqs;
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *partition = esp_ota_get_running_partition();
     const GniotConfig_t * cfg = config_get();
@@ -270,11 +271,10 @@ int do_ota_upgrade(const char * endpoint)
         return r;
     }
 
-    sprintf(req_buf, "GET %s?id=%u HTTP/1.0\r\n"
-            "Host: %s\r\n"
-            "User-Agent: esp-idf/1.0 esp32\r\n\r\n",
-            endpoint, cfg->my_id, client_get_connected_server());
-    r = client_request(req_buf, strlen(req_buf));
+    request_new(&req, endpoint);
+    reqs = request_make(&req);
+
+    r = client_request(reqs, strlen(reqs));
 
     if (r)
     {
