@@ -245,7 +245,6 @@ int do_ota_upgrade(const char * endpoint)
     const char * reqs;
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *partition = esp_ota_get_running_partition();
-    const GniotConfig_t * cfg = config_get();
 
     if (configured != partition)
     {

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "service.h"
 #include "storage.h"
@@ -172,6 +173,11 @@ void command_handler(const char * key, const char * val)
         printf("dump_cfg requested\n");
         CMD_SET(S_CMD_DUMP_CFG);
     }
+    else if (0 == strcmp("clear_store", key))
+    {
+        printf("clear_store requested\n");
+        storage_clear();
+    }
 }
 
 static void dump_config(const GniotConfig_t * cfg)
@@ -199,52 +205,118 @@ static void dump_config(const GniotConfig_t * cfg)
 
 void service_send(int connection_status, uint32_t measurement)
 {
-    const GniotConfig_t * cfg = config_get();
+    bool clear_storage = false;
 
-    int r = client_open();
+    storage_sample_start();
 
-    CMD_CLEAR_ALL();
-
-
-    if (!r)
+    if (connection_status)
     {
-        Request_t request;
-        const char * request_str;
-        request_new(&request, "/kloc");
-
         if (NO_MEASUREMENT != measurement)
         {
-            char keybuf[14];
-            sprintf(keybuf, "m_%u", get_timestamp());
-            request_setu(&request, keybuf, measurement);
+            StorageSample_t store_sample = {
+                    .data = measurement,
+                    .ts = get_timestamp(),
+            };
+            storage_save_sample(&store_sample);
         }
+    }
+    else
+    {
+        const GniotConfig_t * cfg = config_get();
+        int r;
+        int stored_read = 0;
+        Request_t request;
+        char keybuf[14];
+        const char * rs;
 
-        request_str = request_make(&request);
+        CMD_CLEAR_ALL();
 
-        r = client_request(request_str, strlen(request_str));
+        /* send old samples */
+        do
+        {
+            int si;
+            StorageSample_t stored;
+
+            stored_read = storage_next(&stored);
+
+            if (!stored_read)
+            {
+                clear_storage = true;
+                r = client_open();
+                request_new(&request, "/kloc");
+                sprintf(keybuf, "m_%u", stored.ts);
+                request_setu(&request, keybuf, stored.data);
+
+                for (si = 1; !stored_read && si < 10; ++si)
+                {
+                    stored_read = storage_next(&stored);
+                    if (!stored_read)
+                    {
+                        sprintf(keybuf, "m_%u", stored.ts);
+                        request_setu(&request, keybuf, stored.data);
+                    }
+                }
+                rs = request_make(&request);
+                r = client_request(rs, strlen(rs));
+                if (!r)
+                {
+                    r = client_response_iterate(command_handler);
+                }
+                client_close();
+            }
+        } while (!r && !stored_read);
+
+        if (clear_storage) clear_storage = !r && stored_read;
+
         if (!r)
         {
-            r = client_response_iterate(command_handler);
-            if (r)
+            r = client_open();
+            request_new(&request, "/kloc");
+
+            if (NO_MEASUREMENT != measurement)
             {
-                printf("client_response %d\n", r);
+                char keybuf[14];
+                sprintf(keybuf, "m_%u", get_timestamp());
+                request_setu(&request, keybuf, measurement);
             }
 
+            rs = request_make(&request);
+
+            r = client_request(rs, strlen(rs));
+            if (!r)
+            {
+                r = client_response_iterate(command_handler);
+
+            }
+            client_close();
         }
-    }
-    client_close();
 
-    if (IS_CMD_SET(S_CMD_OTA))
-    {
-        printf("Perform OTA\n");
-        do_ota_upgrade("/ota");
-    }
-    if (IS_CMD_SET(S_CMD_DUMP_CFG))
-    {
-        printf("Dump cfg\n");
-        dump_config(cfg);
+
+        if (r && (NO_MEASUREMENT != measurement))
+        {
+            StorageSample_t store_sample = {
+                    .data = measurement,
+                    .ts = get_timestamp(),
+            };
+            storage_save_sample(&store_sample);
+        }
+
+        if (IS_CMD_SET(S_CMD_OTA))
+        {
+            printf("Perform OTA\n");
+            storage_sample_finish(clear_storage);
+            do_ota_upgrade("/ota");
+            return;
+        }
+        if (IS_CMD_SET(S_CMD_DUMP_CFG))
+        {
+            printf("Dump cfg\n");
+            dump_config(cfg);
+        }
+
+        CMD_CLEAR_ALL();
     }
 
-    CMD_CLEAR_ALL();
+    storage_sample_finish(clear_storage);
 }
 

@@ -9,6 +9,14 @@
 #define MAIN_STORAGE_H_
 
 #include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * Size of storage slot for measurements
+ * (in number of measurements)
+ * Chosen to fit into RTC memory.
+ */
+#define MEAS_STORAGE_BANK_SIZE  60
 
 typedef struct
 {
@@ -27,7 +35,12 @@ typedef struct
     uint16_t sleep_length;
 } GniotConfig_t;
 
-typedef uint32_t StorageSample_t;
+typedef struct
+{
+    uint32_t ts;
+    uint32_t data;
+}
+StorageSample_t;
 
 
 void storage_init(void);
@@ -42,11 +55,11 @@ int config_set_myid(uint32_t my_id);
 int config_set_measure(uint16_t measure_period, uint16_t samples_per_measure);
 int config_set_sleep(uint16_t measures_per_sleep, uint16_t sleep_length);
 
-int storage_get_sample(uint32_t idx, StorageSample_t * sample);
-int storage_sample_read_finish(void);
-
-int storage_clear_samples(void);
-int storage_store_sample(const StorageSample_t * sample);
+void storage_sample_start(void);
+int storage_next(StorageSample_t * sample);
+void storage_sample_finish(bool clear_all);
+void storage_save_sample(const StorageSample_t * sample);
+void storage_clear(void);
 
 
 #endif /* MAIN_STORAGE_H_ */

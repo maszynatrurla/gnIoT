@@ -11,6 +11,7 @@
 #include "nvs_flash.h"
 #include "storage.h"
 #include "credentials.h"
+#include "rtc.h"
 
 #define STO_NAMESPACE   "gniot"
 
@@ -27,7 +28,18 @@
 #define DEFAULT_MEASURES_PER_SLEEP  1
 #define DEFAULT_SLEEP_LENGTH        3
 
+
+#define STORAGE_BANK_COUNT  6
+
 static GniotConfig_t s_config;
+
+static struct {
+    nvs_handle handle;
+    int bank_idx;
+    int sample_idx;
+    int first_bank;
+    int written_banks;
+} s_store_read = {0,};
 
 void storage_init(void)
 {
@@ -311,17 +323,127 @@ int config_set_sleep(uint16_t measures_per_sleep, uint16_t sleep_length)
     return (int) err;
 }
 
-int storage_get_sample(uint32_t idx, StorageSample_t * sample)
+
+void storage_sample_start(void)
 {
-    return 0;
+    ESP_ERROR_CHECK(nvs_open(STO_NAMESPACE, NVS_READWRITE, &s_store_read.handle));
+    s_store_read.bank_idx = 0;
+    s_store_read.sample_idx = 0;
+    s_store_read.written_banks = 0;
+
+    int old = -1;
+    uint32_t oldts = 0xFFFFFFFF;
+
+    for (int bi = 0; bi < STORAGE_BANK_COUNT; ++bi)
+    {
+        StorageSample_t sbuf[MEAS_STORAGE_BANK_SIZE];
+        char key [] = "mb ";
+        size_t sblen = sizeof(sbuf);
+        key[2] = 0x30 + s_store_read.bank_idx;
+
+        if (ESP_OK == nvs_get_blob(s_store_read.handle, key, sbuf, &sblen))
+        {
+            ++s_store_read.written_banks;
+            if (sbuf[0].ts < oldts)
+            {
+                oldts = sbuf[0].ts;
+                old = bi;
+            }
+        }
+    }
+
+    s_store_read.first_bank = old;
+
 }
 
-int storage_clear_samples(void)
+int storage_next(StorageSample_t * sample)
 {
-    return 0;
+    if (s_store_read.first_bank >= 0)
+    {
+        for (; s_store_read.bank_idx < STORAGE_BANK_COUNT; ++s_store_read.bank_idx)
+        {
+            StorageSample_t sbuf[MEAS_STORAGE_BANK_SIZE];
+            char key [] = "mb ";
+            size_t sblen = sizeof(sbuf);
+            int bank_idx  = (s_store_read.first_bank + s_store_read.bank_idx) % STORAGE_BANK_COUNT;
+            key[2] = 0x30 + bank_idx;
+
+            if (ESP_OK == nvs_get_blob(s_store_read.handle, key, sbuf, &sblen))
+            {
+                *sample = sbuf[s_store_read.sample_idx];
+                ++(s_store_read.sample_idx);
+                if (s_store_read.sample_idx >= MEAS_STORAGE_BANK_SIZE)
+                {
+                    s_store_read.sample_idx = 0;
+                    ++(s_store_read.bank_idx);
+                }
+                return 0;
+            }
+        }
+    }
+    for (; s_store_read.sample_idx < MEAS_STORAGE_BANK_SIZE; ++s_store_read.sample_idx)
+    {
+
+        if (0 == read_data_from_rtc(s_store_read.sample_idx, sample))
+        {
+            ++s_store_read.sample_idx;
+            return 0;
+        }
+    }
+    return -1;
 }
 
-int storage_store_sample(const StorageSample_t * sample)
+void storage_sample_finish(bool clear_all)
 {
-    return 0;
+    if (clear_all)
+    {
+        storage_clear();
+    }
+    nvs_close(s_store_read.handle);
 }
+
+void storage_save_sample(const StorageSample_t * sample)
+{
+    if (save_data_in_rtc(sample) < 0)
+    {
+        StorageSample_t sbuf[MEAS_STORAGE_BANK_SIZE];
+        char key [] = "mb ";
+        int bank;
+
+        if (s_store_read.written_banks < STORAGE_BANK_COUNT)
+        {
+            bank = s_store_read.written_banks;
+            ++s_store_read.written_banks;
+        }
+        else
+        {
+            bank = s_store_read.first_bank;
+            s_store_read.first_bank = (s_store_read.first_bank + 1) % STORAGE_BANK_COUNT;
+        }
+
+        key[2] = 0x30 + bank;
+
+        for (int si = 0; si < MEAS_STORAGE_BANK_SIZE; ++si)
+        {
+            read_data_from_rtc(si, &sbuf[si]);
+        }
+
+        nvs_set_blob(s_store_read.handle, key, sbuf, sizeof(sbuf));
+
+        clear_rtc_data();
+        save_data_in_rtc(sample);
+    }
+}
+
+void storage_clear(void)
+{
+    for (int bi = 0; bi < STORAGE_BANK_COUNT; ++bi)
+    {
+        char key [] = "mb ";
+        key[2] = 0x30 + bi;
+
+        nvs_erase_key(s_store_read.handle, key);
+    }
+    clear_rtc_data();
+}
+
