@@ -28,7 +28,7 @@ void set_timestamp(uint32_t timestamp);
 /**
  * Save timestamp to RTC memory.
  */
-void save_timestamp(void);
+void save_timestamp(uint32_t add);
 
 int save_data_in_rtc(const StorageSample_t * data);
 int save_data_in_rtc_at(int idx, const StorageSample_t * data);

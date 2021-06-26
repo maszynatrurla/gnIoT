@@ -19,10 +19,7 @@ Temperature and humidity sensor is DHT-11. Another low cost, widely available de
 DHT-22 can be substitued as a sensor, it has the same interface but has wider range and appears to be less prone to incorrect
 readings.
 
-
-Connections
-**TODO**
-
+See DHT_DATA_PIN defined in humtemp.c file to see/modify which GPIO is connected to DHT data pin.
 
 ## Build
 

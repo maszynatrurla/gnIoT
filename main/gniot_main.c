@@ -138,6 +138,126 @@ static void measurements_task(void * arg)
     }
 }
 
+#ifdef STORAGE_TEST
+
+void storage_test_read(void)
+{
+    while (1)
+    {
+        StorageSample_t s;
+        if (0 != storage_next(&s))
+        {
+            break;
+        }
+        printf("RR %u\n", s.ts);
+    }
+}
+
+void storage_test(void)
+{
+    StorageSample_t s;
+
+    printf("1.\n");
+    storage_sample_start();
+    storage_test_read();
+    s.ts = 1;
+    storage_save_sample(&s);
+    storage_sample_finish(false);
+
+    printf("2.\n");
+    storage_sample_start();
+    storage_test_read();
+    storage_save_sample(&s);
+    storage_sample_finish(false);
+
+    printf("3.\n");
+    storage_sample_start();
+    for (int i = 0; i < 200; ++i)
+    {
+        s.ts = 2 + i;
+        storage_save_sample(&s);
+    }
+    storage_save_sample(&s);
+    storage_sample_finish(false);
+
+    printf("4.\n");
+    storage_sample_start();
+    storage_test_read();
+    storage_sample_finish(true);
+
+    printf("5.\n");
+    storage_sample_start();
+    storage_test_read();
+    storage_sample_finish(false);
+
+    printf("6.\n");
+    storage_sample_start();
+    storage_test_read();
+    for (int i = 0; i < 400; ++i)
+    {
+        s.ts = i;
+        storage_save_sample(&s);
+    }
+    storage_sample_finish(false);
+
+    printf("7.\n");
+    storage_sample_start();
+    storage_test_read();
+    storage_sample_finish(true);
+
+    printf("8.\n");
+    storage_sample_start();
+    storage_test_read();
+    storage_sample_finish(false);
+}
+
+#endif
+
+#ifdef TIME_TEST
+void time_test(void)
+{
+    for (int i = 0; i < 10; ++i)
+    {
+        printf("%u\n", get_timestamp());
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        printf("after 1 sec %u\n", get_timestamp());
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        printf("after 2 sec %u\n", get_timestamp());
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        printf("after 3 sec %u\n", get_timestamp());
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        printf("after 10 sec %u\n", get_timestamp());
+    }
+    save_timestamp();
+    esp_restart();
+}
+#endif
+
+#ifdef WIFI_SCAN_TEST
+void wifi_scan_test(void)
+{
+    while (1)
+    {
+        int rssi;
+        if (0 == wifi_scan(&rssi))
+        {
+            if (0 == client_open())
+            {
+                Request_t r;
+                const char * rs;
+                request_new(&r, "/kloc");
+                request_seti(&r, "rssi", (int32_t) rssi);
+                rs = request_make(&r);
+                client_request(rs, strlen(rs));
+                client_response();
+                client_close();
+            }
+        }
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    }
+}
+#endif
+
 void app_main()
 {
     int conn_result;
@@ -151,6 +271,16 @@ void app_main()
     /* Print chip information */
     debug_hello();
 
+#ifdef TIME_TEST
+    time_test();
+#endif
+
+#ifdef STORAGE_TEST
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    storage_test();
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+#endif
+
     /* create a queue for intertask comm */
     s_measurement_queue = xQueueCreate(10, sizeof(uint32_t));
     /* start measurements task */
@@ -161,6 +291,11 @@ void app_main()
     if (0 == conn_result)
     {
         printf("Connected to wifi. IP address = %s\n", wifi_getIpAddress());
+
+#ifdef WIFI_SCAN_TEST
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        wifi_scan_test();
+#endif
     }
 
     while (1)
@@ -197,7 +332,7 @@ void app_main()
     sleep_min = config_get()->sleep_length;
     printf("Going to sleep for %d minutes\n", sleep_min);
     fflush(stdout);
-    save_timestamp();
+    save_timestamp(sleep_min * 60);
     esp_deep_sleep(sleep_min * 60 * 1000000);
 
     // code below should not be executed anymore

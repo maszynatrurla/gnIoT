@@ -20,6 +20,8 @@
 #define RTC_MEM_RESERVED 12
 #define STORE_DATA_OFFSET 2
 
+#define SLEEP_TIME_CORRECTION 16
+
 uint32_t s_time;
 uint32_t s_time_rtc;
 
@@ -55,12 +57,10 @@ void time_init(void)
     /* check if RTC memory is initialized by us */
     if (GNIOT_RTC_MAGIC == read_rtc_mem(0))
     {
-        const GniotConfig_t * cfg = config_get();
         /* second word of memory should contain timestamp saved by us
          * before going into deep-sleep. Therefore we need to assume
          * that time now is time then plus however sleep lasts. */
         s_time = read_rtc_mem(1);
-        s_time += cfg->sleep_length * 60;
     }
     else
     {
@@ -94,11 +94,15 @@ void set_timestamp(uint32_t timestamp)
     s_time_rtc = get_rtc_timestamp();
 }
 
-void save_timestamp(void)
+void save_timestamp(uint32_t add)
 {
     /* first update it */
     (void) get_timestamp();
-    write_rtc_mem(1, s_time);
+    if (add > 60)
+    {
+        add -= SLEEP_TIME_CORRECTION;
+    }
+    write_rtc_mem(1, s_time + add);
     if (GNIOT_RTC_MAGIC != read_rtc_mem(0))
     {
         init_data_bank();
