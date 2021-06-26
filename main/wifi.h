@@ -12,4 +12,6 @@ int wifi_connect(void);
 const char * wifi_getIpAddress(void);
 int wifi_disconnect(void);
 
+int wifi_scan(int * rssi);
+
 #endif /* MAIN_WIFI_H_ */

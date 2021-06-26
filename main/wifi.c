@@ -153,3 +153,57 @@ int wifi_disconnect(void)
     return 0;
 
 }
+
+int wifi_scan(int * rssi)
+{
+    int32_t ret;
+    wifi_scan_config_t scan_config = {0};
+
+    scan_config.ssid = (uint8_t *) CRED_MY_SSID;
+    scan_config.show_hidden = true;
+
+    ret = esp_wifi_scan_start(&scan_config, true);
+
+    if (ESP_OK == ret)
+    {
+        uint16_t found_count;
+        wifi_ap_record_t * records;
+
+
+        esp_wifi_scan_get_ap_num(&found_count);
+        printf("Scan found %d stations\n", found_count);
+
+        records = malloc(found_count * sizeof(*records));
+
+        if (NULL == records)
+        {
+            ESP_LOGE(TAG, "Ups! nie mam pamieci\n");
+            found_count = 0;
+            esp_wifi_scan_get_ap_records(&found_count, records); // free wifi memory?
+        }
+        else
+        {
+            esp_wifi_scan_get_ap_records(&found_count, records);
+
+            for (int i = 0; i < found_count; ++i)
+            {
+                printf("%d.\n", i);
+                printf("    BSSID : %02X:%02X:%02X:%02X:%02X:%02X\n", (unsigned) records[i].bssid[0],
+                        (unsigned) records[i].bssid[1], (unsigned) records[i].bssid[2],
+                        (unsigned) records[i].bssid[3], (unsigned) records[i].bssid[4],
+                        (unsigned) records[i].bssid[5]);
+                printf("    SSID : %s\n", records[i].ssid);
+                printf("    RSSI : %d dB\n", (int) records[i].rssi);
+                *rssi = (int) records[i].rssi;
+            }
+
+            return 0;
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "scan returned %d\n", ret);
+    }
+
+    return -1;
+}
