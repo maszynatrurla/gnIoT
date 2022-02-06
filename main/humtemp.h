@@ -20,11 +20,7 @@
 /**
  * Structure of numbers returned by meter.
  */
-typedef struct
-{
-    uint8_t integer;    /**< Integral part. */
-    uint8_t decimal;    /** Fractional part (base of ten!). */
-} DHT_fixedpoint;
+typedef uint16_t DHT_fixedpoint;
 
 typedef DHT_fixedpoint Humidity_t;      /**< Humidity reading type. */
 typedef DHT_fixedpoint Temperature_t;   /**< Temperature reading type. */

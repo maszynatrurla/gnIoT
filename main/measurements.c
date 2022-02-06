@@ -22,7 +22,7 @@ static uint32_t s_total;
 
 static uint16_t sample_convert(DHT_fixedpoint sample)
 {
-    return sample.integer * 100 + (sample.decimal > 99 ? 99 : sample.decimal);
+    return sample * 10;
 }
 
 void measurement_init(const GniotConfig_t * cfg)

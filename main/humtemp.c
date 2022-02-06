@@ -130,7 +130,7 @@ static void set_input(void)
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = (1ULL << DHT_DATA_PIN);
     io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 1;
+    io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
 }
 
@@ -241,7 +241,7 @@ void humtemp_init(void)
     /* minimal delay from POWER ON till DHT ready
      * can be deleted if this delay is insured by logic
      * somewhere else */
-    vTaskDelay(1000 / portTICK_RATE_MS);
+    vTaskDelay(2500 / portTICK_RATE_MS);
 }
 
 
@@ -256,7 +256,7 @@ int humtemp_read(Humidity_t * humidity, Temperature_t * temperature)
     set_output();
     gpio_set_level(DHT_DATA_PIN, 0);
     /* transmission request must last at least 18 milliseconds */
-    vTaskDelay(30 / portTICK_RATE_MS);
+    vTaskDelay(10 / portTICK_RATE_MS);
 
     /* prepare for interrupt-based data capture from DHT */
     gpio_isr_handler_add(DHT_DATA_PIN, gpio_isr_handler, NULL);
@@ -271,13 +271,17 @@ int humtemp_read(Humidity_t * humidity, Temperature_t * temperature)
         /* verify read data by checksum */
         if ((255 & (s_read.dat[0] + s_read.dat[1] + s_read.dat[2] + s_read.dat[3])) == s_read.dat[4])
         {
-            ESP_LOGI(TAG, "T=%3d.%-2d C  %3d.%-2d rh\n", (int) s_read.dat[0], (int) s_read.dat[1],
-                    (int) s_read.dat[2], (int) s_read.dat[3]);
-            /* copy data to user buffer */
-            humidity->integer = s_read.dat[0];
-            humidity->decimal = s_read.dat[1];
-            temperature->integer = s_read.dat[2];
-            temperature->decimal = s_read.dat[3];
+            int T_sign = s_read.dat[2] & 0x80;
+
+            *humidity = (((uint16_t) s_read.dat[0]) << 8) | (uint16_t) s_read.dat[1];
+            *temperature = (((uint16_t) (s_read.dat[2] & 0x7F)) << 8) | (uint16_t) s_read.dat[3];
+            if (T_sign)
+            {
+                *temperature = 0 - *temperature;
+            }
+
+            ESP_LOGI(TAG, "RH=%02X %02X  T=%02X %02X  \n", (unsigned) s_read.dat[0], (unsigned) s_read.dat[1],
+                    (unsigned) s_read.dat[2], (unsigned) s_read.dat[3]);
             result = HT_SUCCESS;
         }
         else

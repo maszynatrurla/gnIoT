@@ -87,12 +87,11 @@ static void measurements_task(void * arg)
 
             if (0 == humtemp_read(&h, &t))
             {
-                printf("%d.%d C %d.%d rh\n", (int) t.integer, (int) t.decimal,
-                        (int) h.integer, (int) h.decimal);
+                printf("T = %d dsC  RH = %d promili\n", t, h);
                 measurement_add_sample(h, t);
                 ++sidx;
             }
-            vTaskDelay(1500 / portTICK_PERIOD_MS);
+            vTaskDelay(2500 / portTICK_PERIOD_MS);
         }
 
         // get final value of measurement
