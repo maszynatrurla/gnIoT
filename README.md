@@ -5,7 +5,7 @@ Software for amateur build of wifi-enabled temperature and humidity sensor.
 Application periodically reads data from sensor and sends it to HTTP server in local network.
 Between reads it puts uC to sleep.
 
-Keywords: DHT-11, ESP8266, ESP8266_RTOS_SDK, Wi-fi
+Keywords: AM2322, DHT-11, ESP8266, ESP8266_RTOS_SDK, Wi-fi
 
 
 
@@ -15,11 +15,11 @@ The application was written for ESP8266 microcontroller. ESP-01 module was chose
 However, this board does not have WAKE signal exposed. For a deep sleep functionality to work correctly, modification to
 ESP-01 board must be made  which allows to connect WAKE with RST (or just use different board e.g. D1 mini or custom design).
 
-Temperature and humidity sensor is DHT-11. Another low cost, widely available device. 
-DHT-22 can be substitued as a sensor, it has the same interface but has wider range and appears to be less prone to incorrect
-readings.
+Temperature and humidity sensor used to be DHT-11. Another low cost, widely available device. 
+But it was very inaccurate and had high failure rate. It was eventually replaced with more expensive AM2322 model
+that has almost identical single-wire interface.
 
-See DHT_DATA_PIN defined in humtemp.c file to see/modify which GPIO is connected to DHT data pin.
+See DHT_DATA_PIN defined in humtemp.c file to see/modify which GPIO is connected to data pin.
 
 ## Build
 
